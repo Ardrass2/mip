@@ -5,7 +5,7 @@ import numpy as np
 from scipy.integrate import odeint
 import matplotlib.pyplot as plt
 
-guiFlag = False
+guiFlag = True
 
 dt = 1/240 # pybullet simulation step
 th0 = 0.5  # starting position (radian)
@@ -20,8 +20,8 @@ L2 = L
 m = 1      # kg
 f0 = 10    # applied const force
 
-xd = 0.5
-zd = 1
+xd = 0.3
+zd = 2
 
 physicsClient = p.connect(p.GUI if guiFlag else p.DIRECT) # or p.DIRECT for non-graphical version
 p.setAdditionalSearchPath(pybullet_data.getDataPath())
@@ -45,7 +45,7 @@ p.setJointMotorControl2(bodyIndex=boxId, jointIndex=1, targetVelocity=0, control
 pos0 = p.getLinkState(boxId, 4)[0]
 X0 = np.array([[pos0[0]],[pos0[2]]])
 
-maxTime = 5 # seconds
+maxTime = 10 # seconds
 logTime = np.arange(0, maxTime, dt)
 sz = len(logTime)
 logXsim = np.zeros(sz)
@@ -62,12 +62,6 @@ for t in logTime:
     logXsim[idx] = pos[0]
     logZsim[idx] = pos[2]
 
-    jac = np.array([
-        [(-L1*np.cos(th1) - L2*np.cos(th1+th2)), -L2*np.cos(th1+th2)],
-        [(L1*np.sin(th1) + L2*np.sin(th1+th2)), L2*np.sin(th1+th2)]
-    ])
-
-    jac_inv = np.linalg.inv(jac)
     X = np.array([[pos[0]],[pos[2]]])
     Xd = np.array([[xd],[zd]])
 
@@ -76,10 +70,8 @@ for t in logTime:
         s = (3/T**2) * t**2 -2/(T**3) * t**3
     Xd_curr = X0 + s * (Xd - X0)
 
-    vel_d = -100.0 * jac_inv @ (X-Xd_curr)
-    vel_d = vel_d.flatten()
-
-    p.setJointMotorControlArray(bodyIndex=boxId, jointIndices=[1,3], targetVelocities=vel_d, controlMode=p.VELOCITY_CONTROL)
+    kin = p.calculateInverseKinematics(boxId, 4, [Xd_curr[0][0], 0, Xd_curr[1][0]])
+    p.setJointMotorControlArray(bodyIndex=boxId, jointIndices=[1,3], targetPositions=kin, controlMode=p.POSITION_CONTROL)
     p.stepSimulation()
 
     idx += 1
